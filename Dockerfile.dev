@@ -1,0 +1,51 @@
+################################################################################
+FROM ghcr.io/antelopeio/dune:latest as builder  
+
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get -y install \
+            build-essential             \
+            curl                        \
+            manpages-dev                \
+            software-properties-common  \
+            git                         \
+            libcurl4-openssl-dev        \
+            libgmp-dev                  \
+            libssl-dev                  \
+            libusb-1.0-0-dev            \
+            llvm-7-dev                  \
+            pkg-config                  \
+            python3                     \
+            python3-pip                 \
+            zlib1g-dev &&               \
+    rm -rf /var/lib/apt/lists/*
+
+RUN add-apt-repository -y ppa:ubuntu-toolchain-r/test
+RUN apt update && apt install -y gcc-11 g++-11
+RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 10
+RUN update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-11 10
+
+RUN pip3 install --force-reinstall -v "conan==1.59.0"
+
+RUN apt remove -y cmake && cd /opt && wget https://github.com/Kitware/CMake/releases/download/v3.27.2/cmake-3.27.2-linux-x86_64.sh && chmod +x /opt/cmake-3.27.2-linux-x86_64.sh && ./cmake-3.27.2-linux-x86_64.sh --prefix=/usr/local/ --exclude-subdir
+
+WORKDIR /tmp/eos-evm
+
+RUN git clone https://github.com/eosnetworkfoundation/eos-evm.git
+
+WORKDIR /tmp/eos-evm/eos-evm
+
+RUN git submodule update --init --recursive
+
+RUN mkdir build && cd build && cmake .. && make -j
+
+# build eos-evm-node
+
+WORKDIR /tmp/eos-evm
+
+RUN git clone https://github.com/eosnetworkfoundation/eos-evm-node.git
+
+WORKDIR /tmp/eos-evm/eos-evm-node
+
+RUN git submodule update --init --recursive
+
+RUN mkdir build && cd build && cmake .. && make -j8
